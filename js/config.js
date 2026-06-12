@@ -77,7 +77,8 @@ export function getDefaultConfig() {
 
 export function getDefaultEstimate() {
     return {
-        title: 'Новая смета',
+        address: '',
+        customerName: '',
         date: new Date().toISOString().slice(0, 10),
         rooms: []
     };
@@ -186,6 +187,33 @@ export function migrateConfig(config) {
             delete work.step;
         });
     });
+
+    return migrated;
+}
+
+export function migrateEstimate(estimate) {
+    if (!estimate) return getDefaultEstimate();
+
+    const migrated = deepClone(estimate);
+
+    // Миграция: старое поле title заменяется на address и customerName
+    if (migrated.title !== undefined) {
+        migrated.address = migrated.title || '';
+        delete migrated.title;
+    }
+
+    if (typeof migrated.customerName !== 'string') {
+        migrated.customerName = '';
+    }
+    if (typeof migrated.address !== 'string') {
+        migrated.address = '';
+    }
+    if (typeof migrated.date !== 'string') {
+        migrated.date = new Date().toISOString().slice(0, 10);
+    }
+    if (!Array.isArray(migrated.rooms)) {
+        migrated.rooms = [];
+    }
 
     return migrated;
 }

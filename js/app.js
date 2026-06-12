@@ -1,5 +1,5 @@
 import { store } from './state.js';
-import { getDefaultConfig, getDefaultEstimate, migrateConfig } from './config.js';
+import { getDefaultConfig, getDefaultEstimate, migrateConfig, migrateEstimate } from './config.js';
 import { initAdmin } from './admin/admin.js';
 import { initEstimate } from './estimate/estimate.js';
 
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Загрузка состояния
-    store.loadPersisted(() => migrateConfig(getDefaultConfig()), getDefaultEstimate);
+    store.loadPersisted(() => migrateConfig(getDefaultConfig()), () => migrateEstimate(getDefaultEstimate()));
 
     // Инициализация модулей
     initAdmin();

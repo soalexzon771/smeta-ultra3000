@@ -1,5 +1,5 @@
 import { store } from '../state.js';
-import { getDefaultEstimate, findWorkById } from '../config.js';
+import { getDefaultEstimate, findWorkById, migrateEstimate } from '../config.js';
 import { downloadFile, readFile, formatCurrency, formatNumber } from '../utils.js';
 import { createRoom, getSelectedRoomId, setSelectedRoomId, renderRoomsList, renderRoomEditor, updateRoomAreas } from './rooms.js';
 import { calculateEstimate, calculateRoomAreas, getWorkQuantity } from './calculator.js';
@@ -13,7 +13,8 @@ export function initEstimate() {
     const worksSelector = document.getElementById('works-selector');
     const preview = document.getElementById('estimate-preview');
 
-    const titleInput = document.getElementById('estimate-title');
+    const addressInput = document.getElementById('estimate-address');
+    const customerInput = document.getElementById('estimate-customer');
     const dateInput = document.getElementById('estimate-date');
 
     const onRoomSelect = (roomId) => {
@@ -41,12 +42,19 @@ export function initEstimate() {
     onRoomSelect(getSelectedRoomId());
 
     // Шапка сметы
-    titleInput.value = estimate.title;
+    addressInput.value = estimate.address || '';
+    customerInput.value = estimate.customerName || '';
     dateInput.value = estimate.date;
 
-    titleInput.addEventListener('change', () => {
+    addressInput.addEventListener('change', () => {
         const updated = store.getEstimate();
-        updated.title = titleInput.value;
+        updated.address = addressInput.value;
+        store.setEstimate(updated);
+    });
+
+    customerInput.addEventListener('change', () => {
+        const updated = store.getEstimate();
+        updated.customerName = customerInput.value;
         store.setEstimate(updated);
     });
 
@@ -79,14 +87,16 @@ export function initEstimate() {
         try {
             const text = await readFile(file);
             const parsed = JSON.parse(text);
-            if (!parsed.title || !Array.isArray(parsed.rooms)) {
+            if (!Array.isArray(parsed.rooms)) {
                 throw new Error('Некорректный формат сметы');
             }
-            store.setEstimate(parsed);
-            setSelectedRoomId(parsed.rooms[0]?.id || null);
+            const estimate = migrateEstimate(parsed);
+            store.setEstimate(estimate);
+            setSelectedRoomId(estimate.rooms[0]?.id || null);
             onRoomSelect(getSelectedRoomId());
-            titleInput.value = parsed.title;
-            dateInput.value = parsed.date;
+            addressInput.value = estimate.address || '';
+            customerInput.value = estimate.customerName || '';
+            dateInput.value = estimate.date;
             alert('Смета загружена');
         } catch (err) {
             alert('Не удалось загрузить смету: ' + err.message);
@@ -329,7 +339,9 @@ function renderPreview(container) {
 
     wrapper.innerHTML = `
         <h3>Предварительный просмотр сметы</h3>
-        <p><strong>${escapeHtml(result.title)}</strong> от ${escapeHtml(result.date)}</p>
+        <p><strong>Адрес:</strong> ${escapeHtml(result.address || '—')}</p>
+        <p><strong>Заказчик:</strong> ${escapeHtml(result.customerName || '—')}</p>
+        <p><strong>Дата:</strong> ${escapeHtml(result.date)}</p>
     `;
 
     if (!result.rooms.length) {

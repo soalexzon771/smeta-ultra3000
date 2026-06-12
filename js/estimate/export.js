@@ -5,7 +5,9 @@ export function exportToXlsx(config, estimate) {
     const result = calculateEstimate(config, estimate);
 
     const rows = [];
-    rows.push(['Смета', result.title, '', '', '', '']);
+    rows.push(['Смета', '', '', '', '', '']);
+    rows.push(['Адрес', result.address || '', '', '', '', '']);
+    rows.push(['Заказчик', result.customerName || '', '', '', '', '']);
     rows.push(['Дата', result.date, '', '', '', '']);
     rows.push([]);
     rows.push(['№', 'Комната / Работа', 'Ед. изм.', 'Кол-во', 'Цена', 'Сумма']);
@@ -71,10 +73,14 @@ export async function exportToPdf(config, estimate) {
     let y = 20;
 
     doc.setFontSize(18);
-    doc.text(`Смета: ${result.title}`, margin, y);
+    doc.text('Смета', margin, y);
     y += 8;
 
     doc.setFontSize(11);
+    doc.text(`Адрес: ${result.address || '—'}`, margin, y);
+    y += 6;
+    doc.text(`Заказчик: ${result.customerName || '—'}`, margin, y);
+    y += 6;
     doc.text(`Дата: ${result.date}`, margin, y);
     y += 12;
 

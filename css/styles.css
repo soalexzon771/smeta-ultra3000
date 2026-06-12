@@ -335,6 +335,7 @@ body {
 
 .estimate-title {
     display: flex;
+    flex-direction: column;
     gap: 0.75rem;
     align-items: center;
     flex-wrap: wrap;
@@ -347,7 +348,7 @@ body {
     border-bottom: 2px solid var(--border);
     background: transparent;
     padding: 0.25rem 0.5rem;
-    min-width: 280px;
+    min-width: 480px;
 }
 
 .input-title:focus {
