@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Смета-Ultra 3000</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header class="app-header">
+        <h1>🔨 Смета-Ultra 3000</h1>
+        <p>Подготовка сметы для мастера по ремонту</p>
+    </header>
+
+    <nav class="tabs">
+        <button class="tab-button active" data-tab="admin">⚙️ Админка</button>
+        <button class="tab-button" data-tab="estimate">📋 Смета</button>
+    </nav>
+
+    <main class="container">
+        <!-- Админка -->
+        <section id="admin-panel" class="tab-panel active">
+            <div class="panel-toolbar">
+                <h2>Настройки каталога работ</h2>
+                <div class="toolbar-actions">
+                    <button id="btn-download-config" class="btn btn-secondary">⬇️ Скачать config.json</button>
+                    <label class="btn btn-secondary" for="input-upload-config">⬆️ Загрузить config.json</label>
+                    <input type="file" id="input-upload-config" accept="application/json" hidden>
+                    <button id="btn-reset-config" class="btn btn-danger">↩️ Сбросить</button>
+                </div>
+            </div>
+
+            <div class="admin-grid">
+                <div class="admin-card">
+                    <h3>Единицы измерения</h3>
+                    <div id="units-editor"></div>
+                </div>
+
+                <div class="admin-card wide">
+                    <h3>Категории и работы</h3>
+                    <div id="categories-editor"></div>
+                </div>
+
+                <div class="admin-card">
+                    <h3>Шаблоны комнат</h3>
+                    <div id="room-templates-editor"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Смета -->
+        <section id="estimate-panel" class="tab-panel">
+            <div class="panel-toolbar">
+                <div class="estimate-title">
+                    <input type="text" id="estimate-title" placeholder="Название объекта" class="input-title">
+                    <input type="date" id="estimate-date" class="input-date">
+                </div>
+                <div class="toolbar-actions">
+                    <button id="btn-download-estimate" class="btn btn-secondary">💾 Скачать смету</button>
+                    <label class="btn btn-secondary" for="input-upload-estimate">📂 Загрузить смету</label>
+                    <input type="file" id="input-upload-estimate" accept="application/json" hidden>
+                    <button id="btn-export-xlsx" class="btn btn-primary">📊 XLSX</button>
+                    <button id="btn-export-pdf" class="btn btn-primary">📄 PDF</button>
+                </div>
+            </div>
+
+            <div class="estimate-layout">
+                <aside class="estimate-sidebar">
+                    <h3>Комнаты</h3>
+                    <div id="rooms-list"></div>
+                    <button id="btn-add-room" class="btn btn-primary btn-block">+ Добавить комнату</button>
+
+                    <div class="estimate-total-card">
+                        <h3>Итого по смете</h3>
+                        <div class="total-row">
+                            <span>Общая сумма:</span>
+                            <strong id="grand-total">0 ₽</strong>
+                        </div>
+                        <div class="total-row">
+                            <span>Всего работ:</span>
+                            <span id="total-works">0</span>
+                        </div>
+                    </div>
+                </aside>
+
+                <div class="estimate-content">
+                    <div id="room-editor"></div>
+                    <div id="works-selector"></div>
+                    <div id="estimate-preview"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <p>Смета-Ultra 3000 &copy; 2026</p>
+    </footer>
+
+    <!-- Сторонние библиотеки -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Приложение -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
