@@ -140,10 +140,17 @@ function renderWorksSelector(container, roomId) {
         return;
     }
 
-    const grid = document.createElement('div');
-    grid.className = 'works-grid';
-
     config.categories.forEach(category => {
+        if (!category.works.length) return;
+
+        const categoryTitle = document.createElement('div');
+        categoryTitle.className = 'works-category-title';
+        categoryTitle.textContent = escapeHtml(category.name);
+        card.appendChild(categoryTitle);
+
+        const grid = document.createElement('div');
+        grid.className = 'works-grid';
+
         category.works.forEach(work => {
             const fullWork = findWorkById(config, work.id);
             if (!fullWork) return;
@@ -159,7 +166,7 @@ function renderWorksSelector(container, roomId) {
                 <input type="checkbox" class="work-check" value="${fullWork.id}" ${isChecked ? 'checked' : ''}>
                 <div class="work-option-info">
                     <div class="work-option-name">${escapeHtml(fullWork.name)}</div>
-                    <div class="work-option-meta">${escapeHtml(fullWork.categoryName)} · ${formatCurrency(fullWork.price)} / ${escapeHtml(fullWork.unit)}</div>
+                    <div class="work-option-meta">${formatCurrency(fullWork.price)} / ${escapeHtml(fullWork.unit)}</div>
                     <div class="work-quantity-row" style="margin-top:0.5rem; display:flex; align-items:center; gap:0.5rem;"></div>
                 </div>
             `;
@@ -195,11 +202,13 @@ function renderWorksSelector(container, roomId) {
                 renderPreview(document.getElementById('estimate-preview'));
             });
 
-            container.appendChild(card);
-            card.appendChild(grid);
             grid.appendChild(option);
         });
+
+        card.appendChild(grid);
     });
+
+    container.appendChild(card);
 }
 
 function renderQuantityRow(container, work, room, isChecked, quantity, isManual) {
@@ -368,20 +377,39 @@ function renderPreview(container) {
             emptyRow.innerHTML = `<td colspan="6" class="empty-state">Нет выбранных работ</td>`;
             tbody.appendChild(emptyRow);
         } else {
-            room.lines.forEach(line => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${globalIndex++}</td>
-                    <td>${escapeHtml(line.name)}</td>
-                    <td>${escapeHtml(line.unit)}</td>
-                    <td class="text-right">${formatNumber(line.quantity, 2)}</td>
-                    <td class="text-right">${formatCurrency(line.price)}</td>
-                    <td class="text-right">${formatCurrency(line.total)}</td>
+            const grouped = groupBy(room.lines, 'categoryName');
+            Object.entries(grouped).forEach(([categoryName, lines]) => {
+                const categoryRow = document.createElement('tr');
+                categoryRow.innerHTML = `
+                    <td colspan="6" style="background:#f8fafc; font-weight:500; padding-left:1.5rem;">
+                        ${escapeHtml(categoryName)}
+                    </td>
                 `;
-                tbody.appendChild(tr);
+                tbody.appendChild(categoryRow);
+
+                lines.forEach(line => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${globalIndex++}</td>
+                        <td style="padding-left:1.5rem;">${escapeHtml(line.name)}</td>
+                        <td>${escapeHtml(line.unit)}</td>
+                        <td class="text-right">${formatNumber(line.quantity, 2)}</td>
+                        <td class="text-right">${formatCurrency(line.price)}</td>
+                        <td class="text-right">${formatCurrency(line.total)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
             });
         }
     });
+
+    function groupBy(array, key) {
+        return array.reduce((result, item) => {
+            const group = item[key] || 'Без категории';
+            (result[group] = result[group] || []).push(item);
+            return result;
+        }, {});
+    }
 
     wrapper.appendChild(table);
     container.appendChild(wrapper);

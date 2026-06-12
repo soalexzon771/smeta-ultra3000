@@ -16,15 +16,19 @@ export function exportToXlsx(config, estimate) {
         if (!room.lines.length) {
             rows.push(['', 'Нет выбранных работ', '', '', '', '']);
         } else {
-            room.lines.forEach(line => {
-                rows.push([
-                    index++,
-                    line.name,
-                    line.unit,
-                    formatNumber(line.quantity, 2),
-                    formatNumber(line.price, 2),
-                    formatNumber(line.total, 2)
-                ]);
+            const grouped = groupBy(room.lines, 'categoryName');
+            Object.entries(grouped).forEach(([categoryName, lines]) => {
+                rows.push(['', '  ' + categoryName, '', '', '', '']);
+                lines.forEach(line => {
+                    rows.push([
+                        index++,
+                        '    ' + line.name,
+                        line.unit,
+                        formatNumber(line.quantity, 2),
+                        formatNumber(line.price, 2),
+                        formatNumber(line.total, 2)
+                    ]);
+                });
             });
         }
     });
@@ -46,6 +50,14 @@ export function exportToXlsx(config, estimate) {
     ];
 
     XLSX.writeFile(workbook, `smeta_${estimate.date || 'export'}.xlsx`);
+}
+
+function groupBy(array, key) {
+    return array.reduce((result, item) => {
+        const group = item[key] || 'Без категории';
+        (result[group] = result[group] || []).push(item);
+        return result;
+    }, {});
 }
 
 export async function exportToPdf(config, estimate) {
@@ -97,21 +109,34 @@ export async function exportToPdf(config, estimate) {
             return;
         }
 
-        room.lines.forEach(line => {
+        const grouped = groupBy(room.lines, 'categoryName');
+        Object.entries(grouped).forEach(([categoryName, lines]) => {
             if (y > 270) {
                 doc.addPage();
                 y = 20;
             }
 
-            doc.text(String(index++), margin + 2, y);
-            const nameLines = doc.splitTextToSize(line.name, 78);
-            doc.text(nameLines, margin + 12, y);
-            doc.text(line.unit, margin + 95, y);
-            doc.text(formatNumber(line.quantity, 2), margin + 112, y);
-            doc.text(formatNumber(line.price, 2), margin + 135, y);
-            doc.text(formatNumber(line.total, 2), margin + 160, y);
+            doc.setFont(undefined, 'bold');
+            doc.text(categoryName, margin + 5, y);
+            doc.setFont(undefined, 'normal');
+            y += 6;
 
-            y += Math.max(6, nameLines.length * 5);
+            lines.forEach(line => {
+                if (y > 270) {
+                    doc.addPage();
+                    y = 20;
+                }
+
+                doc.text(String(index++), margin + 2, y);
+                const nameLines = doc.splitTextToSize(line.name, 74);
+                doc.text(nameLines, margin + 17, y);
+                doc.text(line.unit, margin + 95, y);
+                doc.text(formatNumber(line.quantity, 2), margin + 112, y);
+                doc.text(formatNumber(line.price, 2), margin + 135, y);
+                doc.text(formatNumber(line.total, 2), margin + 160, y);
+
+                y += Math.max(6, nameLines.length * 5);
+            });
         });
 
         y += 3;

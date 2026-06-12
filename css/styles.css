@@ -465,6 +465,19 @@ body {
     margin: 0 0 1rem;
 }
 
+.works-category-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text);
+    margin: 1.25rem 0 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.works-category-title:first-of-type {
+    margin-top: 0;
+}
+
 .works-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
