@@ -9,7 +9,12 @@ export const FORMULAS = [
 ];
 
 export function getDefaultConfig() {
-    const units = ['м²', 'м.п.', 'шт', 'комплект'];
+    const units = [
+        { name: 'м²', step: 0.01 },
+        { name: 'м.п.', step: 0.01 },
+        { name: 'шт', step: 1 },
+        { name: 'комплект', step: 1 }
+    ];
 
     const painting = {
         id: generateId('cat'),
@@ -78,10 +83,20 @@ export function getDefaultEstimate() {
     };
 }
 
+export function findUnitByName(config, unitName) {
+    return config.units.find(u => {
+        const name = typeof u === 'string' ? u : u?.name;
+        return name === unitName;
+    }) || null;
+}
+
 export function findWorkById(config, workId) {
     for (const category of config.categories) {
         const work = category.works.find(w => w.id === workId);
-        if (work) return { ...work, categoryName: category.name };
+        if (work) {
+            const unit = findUnitByName(config, work.unit);
+            return { ...work, step: unit?.step ?? 0.01, categoryName: category.name };
+        }
     }
     return null;
 }
@@ -107,6 +122,9 @@ export async function importConfig(file) {
 export function validateConfig(config) {
     const errors = [];
     if (!Array.isArray(config.units)) errors.push('units должен быть массивом');
+    else if (!config.units.every(u => u && typeof u.name === 'string' && typeof u.step === 'number')) {
+        errors.push('каждая единица измерения должна содержать name и step');
+    }
     if (!Array.isArray(config.categories)) errors.push('categories должен быть массивом');
     if (!Array.isArray(config.roomTemplates)) errors.push('roomTemplates должен быть массивом');
     return errors;
@@ -142,4 +160,32 @@ export function createRoomTemplate() {
 
 export function cloneConfig(config) {
     return deepClone(config);
+}
+
+export function migrateConfig(config) {
+    if (!config) return getDefaultConfig();
+
+    const migrated = deepClone(config);
+
+    // Миграция units: из массива строк в массив объектов { name, step }
+    if (Array.isArray(migrated.units) && migrated.units.length > 0 && typeof migrated.units[0] === 'string') {
+        migrated.units = migrated.units.map(name => ({
+            name,
+            step: (name === 'шт' || name === 'комплект') ? 1 : 0.01
+        }));
+    }
+
+    // Если units всё ещё не массив объектов — заменяем на default
+    if (!Array.isArray(migrated.units) || !migrated.units.every(u => u && typeof u.name === 'string' && typeof u.step === 'number')) {
+        migrated.units = getDefaultConfig().units;
+    }
+
+    // Удаляем устаревшее поле step из работ (теперь шаг хранится в единице измерения)
+    (migrated.categories || []).forEach(category => {
+        (category.works || []).forEach(work => {
+            delete work.step;
+        });
+    });
+
+    return migrated;
 }

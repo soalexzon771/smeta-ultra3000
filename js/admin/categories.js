@@ -112,7 +112,7 @@ export function renderCategoriesEditor(container) {
             addWorkBtn.textContent = '+ Добавить работу';
             addWorkBtn.addEventListener('click', () => {
                 const updated = store.getConfig();
-                const defaultUnit = updated.units[0] || 'м²';
+                const defaultUnit = updated.units[0]?.name || 'м²';
                 updated.categories[catIndex].works.push(createWork(defaultUnit));
                 store.setConfig(updated);
             });
@@ -137,7 +137,10 @@ export function renderCategoriesEditor(container) {
 }
 
 function renderUnitSelect(units, selected, catIndex, workIndex) {
-    const options = units.map(u => `<option value="${escapeHtml(u)}" ${u === selected ? 'selected' : ''}>${escapeHtml(u)}</option>`).join('');
+    const options = units.map(u => {
+        const name = typeof u === 'string' ? u : u?.name;
+        return `<option value="${escapeHtml(name)}" ${name === selected ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+    }).join('');
     return `<select class="input work-unit-select" data-cat="${catIndex}" data-work="${workIndex}">${options}</select>`;
 }
 

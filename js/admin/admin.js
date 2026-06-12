@@ -1,5 +1,5 @@
 import { store } from '../state.js';
-import { getDefaultConfig, exportConfig, importConfig, validateConfig } from '../config.js';
+import { getDefaultConfig, exportConfig, importConfig, validateConfig, migrateConfig } from '../config.js';
 import { renderUnitsEditor } from './units.js';
 import { renderCategoriesEditor } from './categories.js';
 import { renderRoomTemplatesEditor } from './room-templates.js';
@@ -22,7 +22,8 @@ export function initAdmin() {
         if (!file) return;
 
         try {
-            const config = await importConfig(file);
+            const rawConfig = await importConfig(file);
+            const config = migrateConfig(rawConfig);
             const errors = validateConfig(config);
             if (errors.length) {
                 alert('Ошибки в файле конфигурации:\n' + errors.join('\n'));

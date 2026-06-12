@@ -1,5 +1,5 @@
 import { store } from '../state.js';
-import { getDefaultEstimate } from '../config.js';
+import { getDefaultEstimate, findWorkById } from '../config.js';
 import { downloadFile, readFile, formatCurrency, formatNumber } from '../utils.js';
 import { createRoom, getSelectedRoomId, setSelectedRoomId, renderRoomsList, renderRoomEditor, updateRoomAreas } from './rooms.js';
 import { calculateEstimate, calculateRoomAreas, getWorkQuantity } from './calculator.js';
@@ -145,24 +145,27 @@ function renderWorksSelector(container, roomId) {
 
     config.categories.forEach(category => {
         category.works.forEach(work => {
-            const isChecked = (room.works || []).includes(work.id);
-            const quantity = parseFloat(room.quantities?.[work.id] ?? getWorkQuantity(enrichedRoom, work.formula));
-            const isManual = work.formula === 'fixed' || room.quantities?.[work.id] !== undefined;
+            const fullWork = findWorkById(config, work.id);
+            if (!fullWork) return;
+
+            const isChecked = (room.works || []).includes(fullWork.id);
+            const quantity = parseFloat(room.quantities?.[fullWork.id] ?? getWorkQuantity(enrichedRoom, fullWork.formula));
+            const isManual = fullWork.formula === 'fixed' || room.quantities?.[fullWork.id] !== undefined;
 
             const option = document.createElement('label');
             option.className = 'work-option';
-            option.dataset.workId = work.id;
+            option.dataset.workId = fullWork.id;
             option.innerHTML = `
-                <input type="checkbox" class="work-check" value="${work.id}" ${isChecked ? 'checked' : ''}>
+                <input type="checkbox" class="work-check" value="${fullWork.id}" ${isChecked ? 'checked' : ''}>
                 <div class="work-option-info">
-                    <div class="work-option-name">${escapeHtml(work.name)}</div>
-                    <div class="work-option-meta">${escapeHtml(category.name)} · ${formatCurrency(work.price)} / ${escapeHtml(work.unit)}</div>
+                    <div class="work-option-name">${escapeHtml(fullWork.name)}</div>
+                    <div class="work-option-meta">${escapeHtml(fullWork.categoryName)} · ${formatCurrency(fullWork.price)} / ${escapeHtml(fullWork.unit)}</div>
                     <div class="work-quantity-row" style="margin-top:0.5rem; display:flex; align-items:center; gap:0.5rem;"></div>
                 </div>
             `;
 
             const quantityRow = option.querySelector('.work-quantity-row');
-            renderQuantityRow(quantityRow, work, room, isChecked, quantity, isManual);
+            renderQuantityRow(quantityRow, fullWork, room, isChecked, quantity, isManual);
 
             const checkbox = option.querySelector('.work-check');
             checkbox.addEventListener('change', () => {
@@ -171,22 +174,22 @@ function renderWorksSelector(container, roomId) {
                 const roomData = updated.rooms[idx];
 
                 if (checkbox.checked) {
-                    if (!roomData.works.includes(work.id)) roomData.works.push(work.id);
+                    if (!roomData.works.includes(fullWork.id)) roomData.works.push(fullWork.id);
                     if (!roomData.quantities) roomData.quantities = {};
-                    if (roomData.quantities[work.id] === undefined) {
-                        const qty = work.formula === 'fixed' ? 1 : getWorkQuantity({ ...roomData, ...calculateRoomAreas(roomData) }, work.formula);
-                        roomData.quantities[work.id] = qty;
+                    if (roomData.quantities[fullWork.id] === undefined) {
+                        const qty = fullWork.formula === 'fixed' ? 1 : getWorkQuantity({ ...roomData, ...calculateRoomAreas(roomData) }, fullWork.formula);
+                        roomData.quantities[fullWork.id] = qty;
                     }
                 } else {
-                    roomData.works = roomData.works.filter(id => id !== work.id);
-                    if (roomData.quantities) delete roomData.quantities[work.id];
+                    roomData.works = roomData.works.filter(id => id !== fullWork.id);
+                    if (roomData.quantities) delete roomData.quantities[fullWork.id];
                 }
 
                 store.setEstimate(updated);
 
-                const currentQty = checkbox.checked ? roomData.quantities[work.id] : 0;
-                const currentManual = work.formula === 'fixed' || roomData.quantities?.[work.id] !== undefined;
-                renderQuantityRow(quantityRow, work, roomData, checkbox.checked, currentQty, currentManual);
+                const currentQty = checkbox.checked ? roomData.quantities[fullWork.id] : 0;
+                const currentManual = fullWork.formula === 'fixed' || roomData.quantities?.[fullWork.id] !== undefined;
+                renderQuantityRow(quantityRow, fullWork, roomData, checkbox.checked, currentQty, currentManual);
 
                 renderTotals();
                 renderPreview(document.getElementById('estimate-preview'));
@@ -208,11 +211,14 @@ function renderQuantityRow(container, work, room, isChecked, quantity, isManual)
     label.textContent = 'Кол-во:';
     container.appendChild(label);
 
+    const step = work.step ?? 0.01;
+    const decimals = step >= 1 ? 0 : (step >= 0.1 ? 1 : 2);
+
     const input = document.createElement('input');
     input.type = 'number';
     input.className = 'input work-qty';
-    input.value = Number(quantity).toFixed(2);
-    input.step = '0.01';
+    input.value = Number(quantity).toFixed(decimals);
+    input.step = String(step);
     input.min = '0';
     input.style.width = '90px';
     input.disabled = !isChecked;
@@ -280,7 +286,11 @@ function updateAutoQuantities(container, room) {
             }
 
             const input = option.querySelector('.work-qty');
-            if (input) input.value = Number(autoQty).toFixed(2);
+            if (input) {
+                const step = work.step ?? 0.01;
+                const decimals = step >= 1 ? 0 : (step >= 0.1 ? 1 : 2);
+                input.value = Number(autoQty).toFixed(decimals);
+            }
         });
     });
 
