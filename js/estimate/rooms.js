@@ -54,6 +54,7 @@ export function renderRoomsList(container, onSelect) {
             item.addEventListener('click', (e) => {
                 if (e.target.closest('.btn-delete-room')) return;
                 selectedRoomId = room.id;
+                refresh();
                 onSelect(room.id);
             });
 
@@ -77,7 +78,7 @@ export function renderRoomsList(container, onSelect) {
     return store.subscribe('estimate', refresh);
 }
 
-export function renderRoomEditor(container, roomId) {
+export function renderRoomEditor(container, roomId, onSelect, onChange) {
     container.innerHTML = '';
 
     if (!roomId) {
@@ -118,26 +119,36 @@ export function renderRoomEditor(container, roomId) {
             </div>
         </div>
         <div class="room-areas">
-            <div class="area-badge"><span class="value">${areas.floorArea}</span><span class="label">Пол, м²</span></div>
-            <div class="area-badge"><span class="value">${areas.ceilingArea}</span><span class="label">Потолок, м²</span></div>
-            <div class="area-badge"><span class="value">${areas.wallsArea}</span><span class="label">Стены, м²</span></div>
-            <div class="area-badge"><span class="value">${areas.perimeter}</span><span class="label">Периметр, м</span></div>
+            <div class="area-badge" data-area="floorArea"><span class="value">${areas.floorArea}</span><span class="label">Пол, м²</span></div>
+            <div class="area-badge" data-area="ceilingArea"><span class="value">${areas.ceilingArea}</span><span class="label">Потолок, м²</span></div>
+            <div class="area-badge" data-area="wallsArea"><span class="value">${areas.wallsArea}</span><span class="label">Стены, м²</span></div>
+            <div class="area-badge" data-area="perimeter"><span class="value">${areas.perimeter}</span><span class="label">Периметр, м</span></div>
         </div>
     `;
 
-    const updateRoom = (updates) => {
+    const getRoom = () => {
+        const est = store.getEstimate();
+        return est.rooms.find(r => r.id === roomId);
+    };
+
+    const updateRoom = (updates, triggerChange = false) => {
         const updated = store.getEstimate();
         const idx = updated.rooms.findIndex(r => r.id === roomId);
         if (idx === -1) return;
         updated.rooms[idx] = { ...updated.rooms[idx], ...updates };
         store.setEstimate(updated);
+        if (triggerChange && onChange) {
+            onChange(roomId, updated.rooms[idx]);
+        }
     };
 
-    wrapper.querySelector('.room-name').addEventListener('change', (e) => updateRoom({ name: e.target.value.trim() || 'Без названия' }));
+    wrapper.querySelector('.room-name').addEventListener('change', (e) => {
+        updateRoom({ name: e.target.value.trim() || 'Без названия' });
+    });
 
-    wrapper.querySelector('.room-length').addEventListener('input', (e) => updateRoom({ length: parseNumber(e.target.value) }));
-    wrapper.querySelector('.room-width').addEventListener('input', (e) => updateRoom({ width: parseNumber(e.target.value) }));
-    wrapper.querySelector('.room-height').addEventListener('input', (e) => updateRoom({ height: parseNumber(e.target.value) }));
+    wrapper.querySelector('.room-length').addEventListener('input', (e) => updateRoom({ length: parseNumber(e.target.value) }, true));
+    wrapper.querySelector('.room-width').addEventListener('input', (e) => updateRoom({ width: parseNumber(e.target.value) }, true));
+    wrapper.querySelector('.room-height').addEventListener('input', (e) => updateRoom({ height: parseNumber(e.target.value) }, true));
 
     wrapper.querySelector('.room-template').addEventListener('change', (e) => {
         const templateId = e.target.value;
@@ -153,9 +164,21 @@ export function renderRoomEditor(container, roomId) {
         } else {
             updateRoom({ templateId: null });
         }
+        onSelect(roomId);
     });
 
     container.appendChild(wrapper);
+}
+
+export function updateRoomAreas(container, room) {
+    const areas = calculateRoomAreas(room);
+    const badges = container.querySelectorAll('.area-badge');
+    badges.forEach(badge => {
+        const key = badge.dataset.area;
+        if (key && areas[key] !== undefined) {
+            badge.querySelector('.value').textContent = areas[key];
+        }
+    });
 }
 
 function escapeHtml(text) {

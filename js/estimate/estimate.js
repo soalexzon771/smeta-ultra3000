@@ -1,7 +1,7 @@
 import { store } from '../state.js';
 import { getDefaultEstimate } from '../config.js';
 import { downloadFile, readFile, formatCurrency, formatNumber } from '../utils.js';
-import { createRoom, getSelectedRoomId, setSelectedRoomId, renderRoomsList, renderRoomEditor } from './rooms.js';
+import { createRoom, getSelectedRoomId, setSelectedRoomId, renderRoomsList, renderRoomEditor, updateRoomAreas } from './rooms.js';
 import { calculateEstimate, calculateRoomAreas, getWorkQuantity } from './calculator.js';
 import { exportToXlsx, exportToPdf } from './export.js';
 
@@ -18,8 +18,17 @@ export function initEstimate() {
 
     const onRoomSelect = (roomId) => {
         setSelectedRoomId(roomId);
-        renderRoomEditor(roomEditor, roomId);
+        renderRoomEditor(roomEditor, roomId, onRoomSelect, onRoomChange);
         renderWorksSelector(worksSelector, roomId);
+        renderTotals();
+        renderPreview(preview);
+    };
+
+    const onRoomChange = (roomId, room) => {
+        updateRoomAreas(roomEditor, room);
+        updateAutoQuantities(worksSelector, room);
+        renderTotals();
+        renderPreview(preview);
     };
 
     roomsUnsubscribe = renderRoomsList(roomsList, onRoomSelect);
@@ -98,13 +107,10 @@ export function initEstimate() {
         exportToPdf(config, estimate);
     });
 
-    // Подписка на изменения сметы для пересчёта итогов и превью
+    // Подписка на изменения сметы — пересчитываем только итоги и превью
     store.subscribe('estimate', () => {
         renderTotals();
         renderPreview(preview);
-        const currentId = getSelectedRoomId();
-        renderRoomEditor(roomEditor, currentId);
-        renderWorksSelector(worksSelector, currentId);
     });
 
     renderTotals();
@@ -141,23 +147,22 @@ function renderWorksSelector(container, roomId) {
         category.works.forEach(work => {
             const isChecked = (room.works || []).includes(work.id);
             const quantity = parseFloat(room.quantities?.[work.id] ?? getWorkQuantity(enrichedRoom, work.formula));
-            const autoQuantity = getWorkQuantity(enrichedRoom, work.formula);
             const isManual = work.formula === 'fixed' || room.quantities?.[work.id] !== undefined;
 
             const option = document.createElement('label');
             option.className = 'work-option';
+            option.dataset.workId = work.id;
             option.innerHTML = `
                 <input type="checkbox" class="work-check" value="${work.id}" ${isChecked ? 'checked' : ''}>
                 <div class="work-option-info">
                     <div class="work-option-name">${escapeHtml(work.name)}</div>
                     <div class="work-option-meta">${escapeHtml(category.name)} · ${formatCurrency(work.price)} / ${escapeHtml(work.unit)}</div>
-                    <div class="work-quantity-row" style="margin-top:0.5rem; display:flex; align-items:center; gap:0.5rem;">
-                        <span style="font-size:0.75rem; color:var(--text-muted);">Кол-во:</span>
-                        <input type="number" class="input work-qty" value="${formatNumber(quantity, 2)}" step="0.01" min="0" data-work="${work.id}" style="width:90px;" ${!isChecked ? 'disabled' : ''}>
-                        ${!isManual ? `<button type="button" class="btn btn-sm btn-secondary btn-reset-qty" data-work="${work.id}">Авто</button>` : ''}
-                    </div>
+                    <div class="work-quantity-row" style="margin-top:0.5rem; display:flex; align-items:center; gap:0.5rem;"></div>
                 </div>
             `;
+
+            const quantityRow = option.querySelector('.work-quantity-row');
+            renderQuantityRow(quantityRow, work, room, isChecked, quantity, isManual);
 
             const checkbox = option.querySelector('.work-check');
             checkbox.addEventListener('change', () => {
@@ -168,11 +173,9 @@ function renderWorksSelector(container, roomId) {
                 if (checkbox.checked) {
                     if (!roomData.works.includes(work.id)) roomData.works.push(work.id);
                     if (!roomData.quantities) roomData.quantities = {};
-                    if (work.formula !== 'fixed' && roomData.quantities[work.id] === undefined) {
-                        roomData.quantities[work.id] = getWorkQuantity({ ...roomData, ...calculateRoomAreas(roomData) }, work.formula);
-                    }
-                    if (work.formula === 'fixed' && roomData.quantities[work.id] === undefined) {
-                        roomData.quantities[work.id] = 1;
+                    if (roomData.quantities[work.id] === undefined) {
+                        const qty = work.formula === 'fixed' ? 1 : getWorkQuantity({ ...roomData, ...calculateRoomAreas(roomData) }, work.formula);
+                        roomData.quantities[work.id] = qty;
                     }
                 } else {
                     roomData.works = roomData.works.filter(id => id !== work.id);
@@ -180,36 +183,109 @@ function renderWorksSelector(container, roomId) {
                 }
 
                 store.setEstimate(updated);
+
+                const currentQty = checkbox.checked ? roomData.quantities[work.id] : 0;
+                const currentManual = work.formula === 'fixed' || roomData.quantities?.[work.id] !== undefined;
+                renderQuantityRow(quantityRow, work, roomData, checkbox.checked, currentQty, currentManual);
+
+                renderTotals();
+                renderPreview(document.getElementById('estimate-preview'));
             });
 
-            const qtyInput = option.querySelector('.work-qty');
-            qtyInput.addEventListener('change', () => {
-                const updated = store.getEstimate();
-                const idx = updated.rooms.findIndex(r => r.id === roomId);
-                const roomData = updated.rooms[idx];
-                if (!roomData.quantities) roomData.quantities = {};
-                roomData.quantities[work.id] = parseFloat(qtyInput.value) || 0;
-                store.setEstimate(updated);
-            });
-
-            const resetBtn = option.querySelector('.btn-reset-qty');
-            if (resetBtn) {
-                resetBtn.addEventListener('click', () => {
-                    const updated = store.getEstimate();
-                    const idx = updated.rooms.findIndex(r => r.id === roomId);
-                    const roomData = updated.rooms[idx];
-                    if (!roomData.quantities) roomData.quantities = {};
-                    roomData.quantities[work.id] = getWorkQuantity({ ...roomData, ...calculateRoomAreas(roomData) }, work.formula);
-                    store.setEstimate(updated);
-                });
-            }
-
+            container.appendChild(card);
+            card.appendChild(grid);
             grid.appendChild(option);
         });
     });
+}
 
-    card.appendChild(grid);
-    container.appendChild(card);
+function renderQuantityRow(container, work, room, isChecked, quantity, isManual) {
+    container.innerHTML = '';
+
+    const label = document.createElement('span');
+    label.style.fontSize = '0.75rem';
+    label.style.color = 'var(--text-muted)';
+    label.textContent = 'Кол-во:';
+    container.appendChild(label);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'input work-qty';
+    input.value = Number(quantity).toFixed(2);
+    input.step = '0.01';
+    input.min = '0';
+    input.style.width = '90px';
+    input.disabled = !isChecked;
+    input.dataset.work = work.id;
+    container.appendChild(input);
+
+    if (isChecked) {
+        input.addEventListener('change', () => {
+            const updated = store.getEstimate();
+            const idx = updated.rooms.findIndex(r => r.id === getSelectedRoomId());
+            const roomData = updated.rooms[idx];
+            if (!roomData.quantities) roomData.quantities = {};
+            roomData.quantities[work.id] = parseFloat(input.value) || 0;
+            store.setEstimate(updated);
+            renderTotals();
+            renderPreview(document.getElementById('estimate-preview'));
+        });
+    }
+
+    if (work.formula !== 'fixed' && isChecked) {
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'btn btn-sm btn-secondary btn-reset-qty';
+        resetBtn.textContent = 'Авто';
+        resetBtn.dataset.work = work.id;
+        resetBtn.addEventListener('click', () => {
+            const updated = store.getEstimate();
+            const idx = updated.rooms.findIndex(r => r.id === getSelectedRoomId());
+            const roomData = updated.rooms[idx];
+            if (!roomData.quantities) roomData.quantities = {};
+            const autoQty = getWorkQuantity({ ...roomData, ...calculateRoomAreas(roomData) }, work.formula);
+            roomData.quantities[work.id] = autoQty;
+            store.setEstimate(updated);
+            input.value = formatNumber(autoQty, 2);
+            renderTotals();
+            renderPreview(document.getElementById('estimate-preview'));
+        });
+        container.appendChild(resetBtn);
+    }
+}
+
+function updateAutoQuantities(container, room) {
+    const config = store.getConfig();
+    const enrichedRoom = { ...room, ...calculateRoomAreas(room) };
+
+    config.categories.forEach(category => {
+        category.works.forEach(work => {
+            if (work.formula === 'fixed') return;
+
+            const option = container.querySelector(`.work-option[data-work-id="${work.id}"]`);
+            if (!option) return;
+
+            const checkbox = option.querySelector('.work-check');
+            if (!checkbox.checked) return;
+
+            const roomEstimate = store.getEstimate();
+            const roomData = roomEstimate.rooms.find(r => r.id === room.id);
+            if (!roomData || !roomData.works.includes(work.id)) return;
+
+            // Обновляем только если значение было авто (не переопределено вручную после последнего изменения размера)
+            // Проще: всегда обновляем авто-значение, т.к. при ручном вводе пользователь нажимает change
+            const autoQty = getWorkQuantity(enrichedRoom, work.formula);
+            if (roomData.quantities?.[work.id] !== undefined) {
+                roomData.quantities[work.id] = autoQty;
+            }
+
+            const input = option.querySelector('.work-qty');
+            if (input) input.value = Number(autoQty).toFixed(2);
+        });
+    });
+
+    // Сохраняем обновлённые авто-количества
+    store.setEstimate(store.getEstimate());
 }
 
 function renderTotals() {
